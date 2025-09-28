@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Video Search & Player</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1 class="app-title">YouTube Video Search</h1>
+            
+            <!-- API Key Input Section -->
+            <div class="api-key-section" style="display: none;">
+                <div class="form-group">
+                    <label for="apiKey" class="form-label">YouTube API Key</label>
+                    <input 
+                        type="text" 
+                        id="apiKey" 
+                        class="form-control" 
+                        placeholder="Enter your YouTube Data API v3 key"
+                        autocomplete="off"
+                    >
+                    <div class="api-instructions">
+                        <p><strong>How to get your API key:</strong></p>
+                        <ol>
+                            <li>Go to the <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer">Google Cloud Console</a></li>
+                            <li>Create a new project or select an existing one</li>
+                            <li>Enable the YouTube Data API v3</li>
+                            <li>Create credentials (API Key)</li>
+                            <li>Copy the API key and paste it above</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Search Section -->
+            <div class="search-section">
+                <div class="search-container">
+                    <input 
+                        type="text" 
+                        id="searchInput" 
+                        class="form-control search-input" 
+                        placeholder="Search for YouTube videos..."
+                        autocomplete="off"
+                    >
+                    <button id="searchBtn" class="btn btn--primary search-btn">
+                        Search
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Video Player Section -->
+        <div id="playerSection" class="player-section hidden">
+            <div class="video-player">
+                <iframe 
+                    id="videoPlayer" 
+                    src="" 
+                    frameborder="0" 
+                    allow="autoplay; encrypted-media" 
+                    allowfullscreen>
+                </iframe>
+            </div>
+            <div id="currentVideoInfo" class="current-video-info"></div>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div id="loadingIndicator" class="loading hidden">
+            <div class="loading-spinner"></div>
+            <p>Searching for videos...</p>
+        </div>
+
+        <!-- Error Message -->
+        <div id="errorMessage" class="error-message hidden"></div>
+
+        <!-- Search Results -->
+        <div id="searchResults" class="search-results">
+            <div id="resultsGrid" class="results-grid"></div>
+            
+            <!-- Load More Indicator -->
+            <div id="loadMoreIndicator" class="load-more-indicator hidden">
+                <div class="loading-spinner"></div>
+                <p>Loading more videos...</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
