@@ -162,6 +162,9 @@ class YouTubeSearchApp {
             const videoCard = this.createVideoCard(video, index);
             this.resultsGrid.appendChild(videoCard);
         });
+        
+        // Scroll to the video list after results are displayed
+        this.scrollToVideoList();
     }
     
     appendResults(videos) {
@@ -313,6 +316,17 @@ class YouTubeSearchApp {
     hideLoadMoreIndicator() {
         if (this.loadMoreIndicator) {
             this.loadMoreIndicator.classList.add('hidden');
+        }
+    }
+    
+    scrollToVideoList() {
+        // Scroll to the search results section with smooth behavior
+        const searchResults = document.getElementById('searchResults');
+        if (searchResults) {
+            searchResults.scrollIntoView({ 
+                behavior: 'smooth', 
+                block: 'start' 
+            });
         }
     }
     
