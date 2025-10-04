@@ -10,15 +10,24 @@ class YouTubeSearchApp {
         this.isLoadingMore = false;
         this.hasMoreResults = true;
         
+        // Subscription-related properties
+        this.subscriptions = SUBSCRIPTIONS_DATA.subscriptions;
+        this.currentPage = 'search'; // 'search' or 'subscriptions'
+        this.selectedChannel = null;
+        this.subscriptionVideos = new Map(); // Cache for channel videos
+        this.subscriptionCache = new Map(); // Cache with timestamps
+        
         this.initializeElements();
         this.bindEventListeners();
         this.loadSavedApiKey();
+        this.loadSubscriptionCache();
     }
     
     initializeElements() {
         this.apiKeyInput = document.getElementById('apiKey');
         this.searchInput = document.getElementById('searchInput');
         this.searchBtn = document.getElementById('searchBtn');
+        this.subscriptionsBtn = document.getElementById('subscriptionsBtn');
         this.playerSection = document.getElementById('playerSection');
         this.videoPlayer = document.getElementById('videoPlayer');
         this.currentVideoInfo = document.getElementById('currentVideoInfo');
@@ -26,6 +35,12 @@ class YouTubeSearchApp {
         this.errorMessage = document.getElementById('errorMessage');
         this.resultsGrid = document.getElementById('resultsGrid');
         this.loadMoreIndicator = document.getElementById('loadMoreIndicator');
+        
+        // Subscription page elements
+        this.subscriptionsPage = document.getElementById('subscriptionsPage');
+        this.subscriptionsList = document.getElementById('subscriptionsList');
+        this.subscriptionsVideos = document.getElementById('subscriptionsVideos');
+        this.refreshSubscriptionsBtn = document.getElementById('refreshSubscriptionsBtn');
     }
     
     bindEventListeners() {
@@ -36,6 +51,10 @@ class YouTubeSearchApp {
                 this.handleSearch();
             }
         });
+        
+        // Subscription functionality
+        this.subscriptionsBtn.addEventListener('click', () => this.showSubscriptionsPage());
+        this.refreshSubscriptionsBtn.addEventListener('click', () => this.refreshAllSubscriptions());
         
         // API key management
         this.apiKeyInput.addEventListener('input', () => {
@@ -90,6 +109,11 @@ class YouTubeSearchApp {
             this.showError('Please enter a search query.');
             this.searchInput.focus();
             return;
+        }
+        
+        // Hide subscriptions page if it's currently shown
+        if (this.currentPage === 'subscriptions') {
+            this.hideSubscriptionsPage();
         }
         
         // Reset pagination for new search
@@ -162,6 +186,9 @@ class YouTubeSearchApp {
             const videoCard = this.createVideoCard(video, index);
             this.resultsGrid.appendChild(videoCard);
         });
+        
+        // Show search results section
+        document.getElementById('searchResults').classList.remove('hidden');
         
         // Scroll to the video list after results are displayed
         this.scrollToVideoList();
@@ -328,6 +355,261 @@ class YouTubeSearchApp {
                 block: 'start' 
             });
         }
+    }
+    
+    // Subscription-related methods
+    showSubscriptionsPage() {
+        if (!this.apiKey) {
+            this.showError('Please enter your YouTube Data API v3 key first.');
+            this.showApiKeySection();
+            this.apiKeyInput.focus();
+            return;
+        }
+        
+        this.currentPage = 'subscriptions';
+        this.hideSearchPage();
+        this.showSubscriptionsPageContent();
+        this.populateSubscriptionsList();
+    }
+    
+    hideSearchPage() {
+        document.getElementById('searchResults').classList.add('hidden');
+        this.playerSection.classList.add('hidden');
+        this.hideError();
+    }
+    
+    showSubscriptionsPageContent() {
+        this.subscriptionsPage.classList.remove('hidden');
+        this.subscriptionsPage.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'start' 
+        });
+    }
+    
+    hideSubscriptionsPage() {
+        this.subscriptionsPage.classList.add('hidden');
+        this.currentPage = 'search';
+    }
+    
+    populateSubscriptionsList() {
+        this.subscriptionsList.innerHTML = '';
+        
+        this.subscriptions.forEach((subscription, index) => {
+            const subscriptionItem = document.createElement('div');
+            subscriptionItem.className = 'subscription-item';
+            subscriptionItem.setAttribute('data-channel-id', subscription.id);
+            subscriptionItem.setAttribute('data-channel-name', subscription.name);
+            
+            subscriptionItem.innerHTML = `
+                <div class="subscription-thumbnail">
+                    <img src="${subscription.thumbnail}" alt="${subscription.name}" loading="lazy">
+                </div>
+                <div class="subscription-name">${this.escapeHtml(subscription.name)}</div>
+            `;
+            
+            subscriptionItem.addEventListener('click', () => {
+                this.selectChannel(subscription);
+            });
+            
+            this.subscriptionsList.appendChild(subscriptionItem);
+        });
+    }
+    
+    async selectChannel(subscription) {
+        // Update active state
+        document.querySelectorAll('.subscription-item').forEach(item => {
+            item.classList.remove('active');
+        });
+        
+        const activeItem = document.querySelector(`[data-channel-id="${subscription.id}"]`);
+        if (activeItem) {
+            activeItem.classList.add('active');
+        }
+        
+        this.selectedChannel = subscription;
+        
+        // Check if we have cached data
+        const cachedData = this.getCachedChannelData(subscription.id);
+        const now = Date.now();
+        const cacheExpiry = 30 * 60 * 1000; // 30 minutes
+        
+        if (cachedData && (now - cachedData.timestamp) < cacheExpiry) {
+            this.displayChannelVideos(cachedData.videos, subscription);
+        } else {
+            await this.fetchChannelVideos(subscription);
+        }
+    }
+    
+    async fetchChannelVideos(subscription) {
+        this.showSubscriptionLoading();
+        
+        try {
+            const url = new URL(this.apiEndpoint);
+            url.searchParams.append('part', 'snippet');
+            url.searchParams.append('channelId', subscription.id);
+            url.searchParams.append('type', 'video');
+            url.searchParams.append('order', 'date');
+            url.searchParams.append('maxResults', '20');
+            url.searchParams.append('key', this.apiKey);
+            
+            const response = await fetch(url.toString());
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.error?.message || 'Failed to fetch channel videos');
+            }
+            
+            const videos = data.items || [];
+            
+            // Cache the data
+            this.cacheChannelData(subscription.id, videos);
+            
+            this.displayChannelVideos(videos, subscription);
+            
+        } catch (error) {
+            this.hideSubscriptionLoading();
+            this.handleApiError(error);
+        }
+    }
+    
+    displayChannelVideos(videos, subscription) {
+        this.hideSubscriptionLoading();
+        
+        if (videos.length === 0) {
+            this.subscriptionsVideos.innerHTML = `
+                <div class="subscriptions-placeholder">
+                    <p>No videos found for ${subscription.name}</p>
+                </div>
+            `;
+            return;
+        }
+        
+        const videosGrid = document.createElement('div');
+        videosGrid.className = 'subscription-videos-grid';
+        
+        videos.forEach(video => {
+            const videoCard = this.createSubscriptionVideoCard(video);
+            videosGrid.appendChild(videoCard);
+        });
+        
+        this.subscriptionsVideos.innerHTML = '';
+        this.subscriptionsVideos.appendChild(videosGrid);
+    }
+    
+    createSubscriptionVideoCard(video) {
+        const { id, snippet } = video;
+        const videoId = id.videoId;
+        const title = snippet.title;
+        const channelTitle = snippet.channelTitle;
+        const thumbnail = snippet.thumbnails.medium?.url || snippet.thumbnails.default?.url;
+        const publishedDate = this.formatDate(snippet.publishedAt);
+        
+        const card = document.createElement('div');
+        card.className = 'subscription-video-card';
+        card.tabIndex = 0;
+        card.setAttribute('data-video-id', videoId);
+        card.setAttribute('role', 'button');
+        card.setAttribute('aria-label', `Play video: ${title}`);
+        
+        card.innerHTML = `
+            <div class="subscription-video-thumbnail">
+                <img src="${thumbnail}" alt="${title}" loading="lazy">
+            </div>
+            <div class="subscription-video-info">
+                <h3 class="subscription-video-title">${this.escapeHtml(title)}</h3>
+                <p class="subscription-video-channel">${this.escapeHtml(channelTitle)}</p>
+                <p class="subscription-video-date">${publishedDate}</p>
+            </div>
+        `;
+        
+        // Add click and keyboard event listeners
+        card.addEventListener('click', () => this.playVideo(videoId, title, channelTitle));
+        card.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                this.playVideo(videoId, title, channelTitle);
+            }
+        });
+        
+        return card;
+    }
+    
+    showSubscriptionLoading() {
+        this.subscriptionsVideos.innerHTML = `
+            <div class="subscription-loading">
+                <div class="loading-spinner"></div>
+                <p>Loading videos from ${this.selectedChannel?.name || 'channel'}...</p>
+            </div>
+        `;
+    }
+    
+    hideSubscriptionLoading() {
+        // Loading will be replaced by displayChannelVideos
+    }
+    
+    async refreshAllSubscriptions() {
+        if (!this.apiKey) {
+            this.showError('Please enter your YouTube Data API v3 key first.');
+            return;
+        }
+        
+        // Clear all cached data
+        this.clearSubscriptionCache();
+        
+        // Refresh current channel if one is selected
+        if (this.selectedChannel) {
+            await this.fetchChannelVideos(this.selectedChannel);
+        } else {
+            // Show placeholder
+            this.subscriptionsVideos.innerHTML = `
+                <div class="subscriptions-placeholder">
+                    <p>Select a channel to view its latest videos</p>
+                </div>
+            `;
+        }
+    }
+    
+    // Local storage methods for subscription cache
+    loadSubscriptionCache() {
+        try {
+            const cached = localStorage.getItem('subscriptionCache');
+            if (cached) {
+                const cacheData = JSON.parse(cached);
+                this.subscriptionCache = new Map(cacheData);
+            }
+        } catch (error) {
+            console.warn('Failed to load subscription cache:', error);
+            this.subscriptionCache = new Map();
+        }
+    }
+    
+    saveSubscriptionCache() {
+        try {
+            const cacheArray = Array.from(this.subscriptionCache.entries());
+            localStorage.setItem('subscriptionCache', JSON.stringify(cacheArray));
+        } catch (error) {
+            console.warn('Failed to save subscription cache:', error);
+        }
+    }
+    
+    getCachedChannelData(channelId) {
+        return this.subscriptionCache.get(channelId);
+    }
+    
+    cacheChannelData(channelId, videos) {
+        const cacheData = {
+            videos: videos,
+            timestamp: Date.now(),
+            batchId: `batch_${Date.now()}_${channelId}`
+        };
+        
+        this.subscriptionCache.set(channelId, cacheData);
+        this.saveSubscriptionCache();
+    }
+    
+    clearSubscriptionCache() {
+        this.subscriptionCache.clear();
+        this.saveSubscriptionCache();
     }
     
     handleApiError(error) {

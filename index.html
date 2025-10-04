@@ -6,6 +6,7 @@
     <title>YouTube Video Search & Player</title>
     <link rel="stylesheet" href="style.css">
     <link rel="icon"  href="favicon.ico">
+    <script src="subscriptions.js"></script>
 
 </head>
 <body>
@@ -50,6 +51,9 @@
                     <button id="searchBtn" class="btn btn--primary search-btn">
                         Search
                     </button>
+                    <button id="subscriptionsBtn" class="btn btn--secondary subscriptions-btn">
+                        My Subscriptions
+                    </button>
                 </div>
             </div>
         </header>
@@ -85,6 +89,34 @@
             <div id="loadMoreIndicator" class="load-more-indicator hidden">
                 <div class="loading-spinner"></div>
                 <p>Loading more videos...</p>
+            </div>
+        </div>
+
+        <!-- Subscriptions Page -->
+        <div id="subscriptionsPage" class="subscriptions-page hidden">
+            <div class="subscriptions-header">
+                <h2>My Subscriptions</h2>
+                <button id="refreshSubscriptionsBtn" class="btn btn--primary refresh-btn">
+                    <span class="refresh-icon">🔄</span>
+                    Refresh
+                </button>
+            </div>
+            
+            <div class="subscriptions-layout">
+                <!-- Sidebar with subscription list -->
+                <div class="subscriptions-sidebar">
+                    <h3>Channels</h3>
+                    <div id="subscriptionsList" class="subscriptions-list"></div>
+                </div>
+                
+                <!-- Main content area with videos -->
+                <div class="subscriptions-main">
+                    <div id="subscriptionsVideos" class="subscriptions-videos">
+                        <div class="subscriptions-placeholder">
+                            <p>Select a channel to view its latest videos</p>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
